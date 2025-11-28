@@ -1,6 +1,6 @@
 import React from 'react';
-import { Terminal, Database, Cpu, Wifi, Globe, Shield } from 'lucide-react'; // Simulating icons with text fallback if lucide isn't available, but standard lucide import is safe.
-// To ensure icons work without package installation, I'll use SVG directly in a helper component for safety in this strict output format.
+// Removed lucide-react import to prevent "Minified React error #31" on Vercel deployment.
+// We are using custom SVG components defined below.
 
 const Icon = ({ path, color = "currentColor" }: { path: string, color?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

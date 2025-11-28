@@ -1,65 +1,508 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cyberpunk Agency - WE HACK THE FUTURE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              mono: ['"Courier Prime"', 'monospace'],
-            },
-            colors: {
-              neon: {
-                cyan: '#00ffff',
-                magenta: '#ff00ff',
-                yellow: '#ffff00',
-              }
-            }
-          }
-        }
-      }
-    </script>
+    
+    <!-- External Libraries via CDN (No importmap, No React) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    
     <style>
-      body {
-        margin: 0;
-        background-color: #000;
-        overflow-x: hidden;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #000;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #00ffff;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #ff00ff;
-      }
+        /* --- RESET & BASE STYLES --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            /* Height will be set by JS for virtual scroll, or we let content push it */
+        }
+
+        /* --- CANVAS --- */
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1; /* Behind content */
+            pointer-events: none;
+        }
+
+        /* --- HERO SECTION --- */
+        #hero {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            /* Grid background pattern */
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* --- MOUSE REVEAL EFFECT --- */
+        .hero-content {
+            position: relative;
+            width: 100%;
+            height: 400px; /* Container for text */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .text-layer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* BASE LAYER: Outline Text */
+        .base-layer h1 {
+            font-size: 8vw; /* Responsive font size */
+            font-weight: 900;
+            color: transparent;
+            -webkit-text-stroke: 1px rgba(0, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5vw;
+            margin: 0;
+            line-height: 1.1;
+            transition: opacity 0.5s;
+        }
+
+        /* REVEAL LAYER: Filled Neon Text */
+        .reveal-layer {
+            /* Initial clip-path, updated by JS */
+            clip-path: circle(0px at 0 0);
+            transition: clip-path 0.1s ease-out; /* Smooth follow lag */
+            z-index: 20;
+        }
+
+        .reveal-layer h1 {
+            font-size: 8vw;
+            font-weight: 900;
+            color: #00ffff;
+            text-shadow: 
+                0 0 10px rgba(0, 255, 255, 0.8),
+                0 0 20px rgba(0, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5vw;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: #ff00ff;
+            margin-top: 2rem;
+            letter-spacing: 0.5rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+
+        /* --- CTA BUTTON --- */
+        .cta-button {
+            position: absolute;
+            bottom: 15%;
+            padding: 15px 40px;
+            font-size: 1rem;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            z-index: 30;
+        }
+
+        .cta-button:hover {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        /* --- SCROLL CONTENT SECTIONS --- */
+        /* These will appear after the scroll transition */
+        .content-wrapper {
+            position: relative;
+            z-index: 20;
+            opacity: 0; /* Hidden initially */
+            margin-top: 100vh; /* Push down */
+            background: linear-gradient(to bottom, transparent, #050505 10%);
+            pointer-events: none; /* Interactable only when visible */
+        }
+
+        .section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            margin-top: 4rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 2rem;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #00ffff;
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .card h3 {
+            color: #00ffff;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+        }
+
+        .card p {
+            color: #ccc;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        .section-title {
+            font-size: 3rem;
+            color: #fff;
+            border-bottom: 2px solid #ff00ff;
+            padding-bottom: 1rem;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .base-layer h1, .reveal-layer h1 { font-size: 12vw; }
+            .subtitle { font-size: 1rem; }
+        }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "three": "https://aistudiocdn.com/three@^0.181.2",
     "gsap": "https://aistudiocdn.com/gsap@^3.13.0",
     "gsap/": "https://aistudiocdn.com/gsap@^3.13.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
 </script>
 </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<body>
+
+    <!-- 1. WEBGL BACKGROUND -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- 2. HERO SECTION WITH MOUSE REVEAL -->
+    <section id="hero">
+        <div class="hero-content" id="hero-content-area">
+            <!-- Outline Layer (Always Visible) -->
+            <div class="text-layer base-layer">
+                <h1>Cyberpunk</h1>
+                <h1>Agency</h1>
+                <p class="subtitle">We Hack The Future</p>
+            </div>
+            
+            <!-- Reveal Layer (Masked by Clip Path) -->
+            <div class="text-layer reveal-layer">
+                <h1>Cyberpunk</h1>
+                <h1>Agency</h1>
+                <p class="subtitle">We Hack The Future</p>
+            </div>
+        </div>
+        
+        <button class="cta-button" onclick="window.scrollTo({top: window.innerHeight, behavior: 'smooth'})">
+            Enter The Matrix
+        </button>
+    </section>
+
+    <!-- 3. SCROLLABLE CONTENT (Appears after 3D transition) -->
+    <div class="content-wrapper" id="content-wrapper">
+        
+        <!-- Services Section -->
+        <section id="services" class="section">
+            <h2 class="section-title">System Protocols</h2>
+            <div class="grid-cards">
+                <div class="card">
+                    <h3>Neural Injection</h3>
+                    <p>Direct interface connections creating immersive web experiences that hijack the senses.</p>
+                </div>
+                <div class="card">
+                    <h3>Digital Warfare</h3>
+                    <p>Aggressive algorithmic strategies to dominate search sectors and social grids.</p>
+                </div>
+                <div class="card">
+                    <h3>Crypto Defense</h3>
+                    <p>Military-grade encryption for your digital assets. We build walls of ice.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="section">
+            <h2 class="section-title" style="border-color: #00ffff; text-shadow: 0 0 20px rgba(0,255,255,0.3)">Deployed Units</h2>
+            <div class="grid-cards">
+                <div class="card" style="border-color: #ff00ff">
+                    <h3>Project: Ghost</h3>
+                    <p>Stealth marketing campaign for a Fortune 500 AI conglomerate.</p>
+                </div>
+                <div class="card" style="border-color: #ff00ff">
+                    <h3>Op: Neon Rain</h3>
+                    <p>Visual synthesis and branding for the upcoming Metaverse city launch.</p>
+                </div>
+                <div class="card" style="border-color: #ff00ff">
+                    <h3>Data Ronin</h3>
+                    <p>Automated mercenary bots handling 24/7 customer engagement.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section class="section" style="min-height: 50vh">
+            <div style="border: 1px solid #00ffff; padding: 3rem; text-align: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);">
+                <h2 style="color: #00ffff; margin-bottom: 2rem; text-transform: uppercase; letter-spacing: 5px;">Initialize Uplink</h2>
+                <p style="margin-bottom: 2rem; color: #aaa;">Secure channel ready. Transmit payload?</p>
+                <button class="cta-button" style="position: relative; bottom: auto; left: auto; transform: none;">Connect</button>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- 1. MOUSE REVEAL LOGIC ---
+        const heroSection = document.getElementById('hero');
+        const heroContent = document.getElementById('hero-content-area');
+        const revealLayer = document.querySelector('.reveal-layer');
+        
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let currentX = window.innerWidth / 2;
+        let currentY = window.innerHeight / 2;
+
+        // Track mouse relative to viewport
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Animation loop for smooth reveal
+        function animateReveal() {
+            // Linear interpolation (lerp) for smooth following
+            const ease = 0.1;
+            currentX += (mouseX - currentX) * ease;
+            currentY += (mouseY - currentY) * ease;
+            
+            // Calculate position relative to the text container if needed, 
+            // but here we use fixed clip-path on the fixed hero section logic
+            
+            // We need to offset the circle based on the container's position if it wasn't fixed,
+            // but since Hero is fixed, clientX/Y works well.
+            // However, the revealLayer is inside hero-content. 
+            // Let's adjust for the bounding box of the reveal layer.
+            const rect = revealLayer.getBoundingClientRect();
+            const relX = currentX - rect.left;
+            const relY = currentY - rect.top;
+
+            revealLayer.style.clipPath = `circle(120px at ${relX}px ${relY}px)`;
+            
+            requestAnimationFrame(animateReveal);
+        }
+        animateReveal();
+
+
+        // --- 2. THREE.JS BACKGROUND & OBJECT ---
+        const canvas = document.getElementById('webgl-canvas');
+        const scene = new THREE.Scene();
+        // Fog for depth fading
+        scene.fog = new THREE.FogExp2(0x000000, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 50;
+
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: canvas, 
+            alpha: true, 
+            antialias: true 
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // -- The "Portal" / Object to fly through --
+        // Icosahedron with wireframe
+        const geometry = new THREE.IcosahedronGeometry(15, 1);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.8
+        });
+        const mainMesh = new THREE.Mesh(geometry, material);
+        mainMesh.position.z = -150; // Start far back
+        scene.add(mainMesh);
+
+        // -- Particle System (Starfield) --
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 1000;
+        const posArray = new Float32Array(particlesCount * 3);
+
+        for(let i = 0; i < particlesCount * 3; i++) {
+            // Spread particles in a tunnel shape
+            posArray[i] = (Math.random() - 0.5) * 200;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.3,
+            color: 0xff00ff,
+            transparent: true,
+            opacity: 0.6
+        });
+        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particlesMesh);
+
+        // -- Animation Loop for Idle Movement --
+        function animateThree() {
+            requestAnimationFrame(animateThree);
+            
+            // Rotate object
+            mainMesh.rotation.x += 0.002;
+            mainMesh.rotation.y += 0.003;
+            
+            // Rotate starfield slowly
+            particlesMesh.rotation.z += 0.0005;
+
+            renderer.render(scene, camera);
+        }
+        animateThree();
+
+        // -- Handle Window Resize --
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+
+        // --- 3. SCROLL INTERACTIONS (GSAP) ---
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Increase body height to create virtual scroll space
+        // We want a long scroll before showing content
+        document.body.style.height = '400vh'; 
+
+        const contentWrapper = document.getElementById('content-wrapper');
+
+        // Main Timeline
+        ScrollTrigger.create({
+            trigger: 'body',
+            start: 'top top',
+            end: '+=2000', // The distance of the "flight"
+            scrub: 1, // Smooth scrubbing
+            onUpdate: (self) => {
+                const progress = self.progress; // 0 to 1
+                
+                // PHASE 1: Approach (0 - 0.5)
+                // Text fades out, Object gets closer
+                if (progress < 0.5) {
+                    const phase1 = progress * 2; // 0 to 1
+                    
+                    // Fade out Hero Text
+                    heroSection.style.opacity = 1 - Math.pow(phase1, 3);
+                    
+                    // Move Object Closer
+                    // Start: -150, End: -50
+                    mainMesh.position.z = -150 + (phase1 * 100);
+                    
+                    // Rotate faster as we get closer
+                    mainMesh.rotation.z = phase1 * 2;
+                }
+                
+                // PHASE 2: Fly Through (0.5 - 1.0)
+                // Object engulfs camera, fades out, Content fades in
+                else {
+                    const phase2 = (progress - 0.5) * 2; // 0 to 1
+                    
+                    // Hero completely gone
+                    heroSection.style.opacity = 0;
+                    
+                    // Move Object Past Camera
+                    // Start: -50, End: 50 (Camera is at 50) -> Wait, camera is at 50. 
+                    // To pass camera at 50, object needs to go > 50.
+                    // Let's move object from -50 to 100.
+                    mainMesh.position.z = -50 + (phase2 * 150);
+                    
+                    // Scale UP drastically to simulate going inside
+                    const scale = 1 + (phase2 * 10);
+                    mainMesh.scale.set(scale, scale, scale);
+                    
+                    // Fade out the object wireframe as we are "inside" it
+                    mainMesh.material.opacity = 1 - (phase2 * 2); 
+                    if(mainMesh.material.opacity < 0) mainMesh.material.opacity = 0;
+
+                    // Reveal Content
+                    // Start showing content at the end of the flight (around 80%)
+                    if (phase2 > 0.5) {
+                        const contentOpacity = (phase2 - 0.5) * 2;
+                        contentWrapper.style.opacity = contentOpacity;
+                        contentWrapper.style.pointerEvents = contentOpacity > 0.9 ? 'auto' : 'none';
+                    } else {
+                        contentWrapper.style.opacity = 0;
+                        contentWrapper.style.pointerEvents = 'none';
+                    }
+                }
+            },
+            onLeave: () => {
+                // When scroll passes the virtual height, ensure content is visible
+                // and maybe reset body height handling or let standard scroll take over
+                // For this simple demo, we keep the scrub logic active.
+                contentWrapper.style.opacity = 1;
+                contentWrapper.style.pointerEvents = 'auto';
+            },
+            onLeaveBack: () => {
+                contentWrapper.style.opacity = 0;
+                contentWrapper.style.pointerEvents = 'none';
+            }
+        });
+
+    </script>
+</body>
 </html>
